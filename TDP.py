@@ -2,33 +2,40 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-st.set_page_config(page_title="Tra cứu trạm gần nhất", layout="wide")
+# Cấu hình trang (Tùy chọn)
+st.set_page_config(
+    page_title="Tra cứu trạm gần nhất",
+    page_icon="📍",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 st.title("📍 Tra cứu khoảng cách trạm gần nhất")
 
 # 1. Tải dữ liệu Data nền từ file Excel
 @st.cache_data
 def load_data():
     # Đọc sheet 'Data' và lấy dữ liệu từ hàng 3 trở đi
+    # Skiprows=2 để bỏ qua 2 hàng tiêu đề đầu tiên
     df = pd.read_excel("DATA Trạm.xlsx", sheet_name="Data", skiprows=2)
     return df
 
 try:
     df_raw = load_data()
 
-    # 2. Tiền xử lý dữ liệu để sửa lỗi TypeError
-    # Bản sao để tránh làm hỏng dữ liệu gốc
+    # 2. Tiền xử lý dữ liệu để đảm bảo các ô trống không gây lỗi
     df_clean = df_raw.copy()
 
-    # Thử chuyển đổi cột Lat và Long (Cột 20 và 21) sang kiểu số
-    # coerce: Nếu gặp ô trống/văn bản thì chuyển thành NaN (Not a Number)
+    # Chuyển đổi cột Lat và Long (Cột T và U) sang kiểu số
     df_clean.iloc[:, 19] = pd.to_numeric(df_clean.iloc[:, 19], errors='coerce')
     df_clean.iloc[:, 20] = pd.to_numeric(df_clean.iloc[:, 20], errors='coerce')
 
     # Loại bỏ các hàng mà dữ liệu Lat hoặc Long bị trống (NaN)
+    # df_clean.columns[19] là tên cột T, df_clean.columns[20] là tên cột U
     df_clean = df_clean.dropna(subset=[df_clean.columns[19], df_clean.columns[20]])
 
-    # 3. Nhập tọa độ (Mô phỏng ô D7 hoặc nhập riêng D3, E3)
-    # Lấy tọa độ ví dụ từ file Excel của bạn: D7 = 10.584258989621397, 107.05803434236459
+    # 3. Nhập tọa độ cần tra cứu
+    # Bạn có thể điều chỉnh giá trị mặc định (value=...) tại đây
     input_lat = st.number_input("Nhập LATITUDE (Vĩ độ):", format="%.6f", value=10.584259)
     input_lng = st.number_input("Nhập LONGITUDE (Kinh độ):", format="%.6f", value=107.058034)
 
@@ -36,37 +43,37 @@ try:
         with st.spinner('Đang tính toán khoảng cách...'):
             # Chuyển đổi tọa độ nhập vào và tọa độ trong dữ liệu sang Radians
             lat1, lon1 = np.radians(input_lat), np.radians(input_lng)
-            
-            # Sử dụng dữ liệu đã làm sạch để tính toán
-            lat2 = np.radians(df_clean.iloc[:, 19].astype(float))
-            lon2 = np.radians(df_clean.iloc[:, 20].astype(float))
+            lat2 = np.radians(df_clean.iloc[:, 19])
+            lon2 = np.radians(df_clean.iloc[:, 20])
 
-            # Công thức Haversine/Khoảng cách tương đương cột W trong sheet Data:
+            # Công thức Haversine để tính khoảng cách (mét)
             dlat = lat2 - lat1
             dlon = lon2 - lon1
             a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
             c = 2 * np.arcsin(np.sqrt(a))
-            
-            r = 6371000 # Bán kính Trái Đất (m) - Giống công thức W3
+            r = 6371000  # Bán kính Trái Đất (m) - trùng công thức ô W3
             
             # Gán kết quả tính toán (Khoảng cách tính bằng mét)
             df_clean['Khoảng cách (m)'] = c * r
 
-            # Lấy 5 hàng có khoảng cách nhỏ nhất (tương đương H3:H7)
+            # Sắp xếp để lấy 5 kết quả gần nhất (tương đương H3:H7)
             top5 = df_clean.sort_values(by='Khoảng cách (m)').head(5)
 
             st.subheader("🎯 Kết quả 5 trạm gần nhất:")
             
             # Hiển thị bảng kết quả với định dạng rõ ràng
-            # Bạn có thể điều chỉnh các cột muốn hiển thị tại đây
-            display_cols = ['Tên trạm', 'Địa chỉ', 'Tỉnh', 'Lat', 'Long', 'Khoảng cách (m)']
+            # Bạn có thể điều chỉnh danh sách và thứ tự các cột hiển thị tại đây
+            display_cols = ['Khoảng cách (m)', 'Mã trạm theo SU', 'Tên trạm', 'Lat', 'Long', 'Địa chỉ', 'Tỉnh']
             cols_to_show = [c for c in display_cols if c in top5.columns]
             
-            if not cols_to_show: # Nếu không tìm thấy các tên cột chuẩn, hiển thị tất cả
+            # Nếu không tìm thấy các tên cột chuẩn, hiển thị tất cả các cột
+            if not cols_to_show:
                 cols_to_show = top5.columns
 
+            # reset_index(drop=True) để hiển thị STT từ 0 đến 4
             st.dataframe(top5[cols_to_show].reset_index(drop=True), use_container_width=True)
 
+except FileNotFoundError:
+    st.error("Không tìm thấy file dữ liệu 'DATA Trạm.xlsx'. Bạn hãy đảm bảo file này đã được tải lên cùng thư mục với file `.py`.")
 except Exception as e:
-    st.error(f"Đã xảy ra lỗi khi tải dữ liệu. Hãy đảm bảo file 'DATA Trạm.xlsx' có cấu trúc đúng: {e}")
-    st.info("Kiểm tra lại nếu file Excel của bạn có sheet tên 'Data' và dữ liệu tọa độ nằm ở cột T và U từ hàng 3.")
+    st.error(f"Đã xảy ra lỗi không xác định. Có thể file 'DATA Trạm.xlsx' có cấu trúc không đúng hoặc bị lỗi: {e}")
