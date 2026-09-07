@@ -2,12 +2,10 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-# Cấu hình trang (Tùy chọn)
 st.set_page_config(
     page_title="Tra cứu trạm gần nhất",
     page_icon="📍",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    layout="wide"
 )
 
 st.title("📍 Tra cứu khoảng cách trạm gần nhất")
@@ -15,65 +13,69 @@ st.title("📍 Tra cứu khoảng cách trạm gần nhất")
 # 1. Tải dữ liệu Data nền từ file Excel
 @st.cache_data
 def load_data():
-    # Đọc sheet 'Data' và lấy dữ liệu từ hàng 3 trở đi
-    # Skiprows=2 để bỏ qua 2 hàng tiêu đề đầu tiên
-    df = pd.read_excel("DATA Trạm.xlsx", sheet_name="Data", skiprows=2)
+    # Đọc sheet 'Data', dòng 2 là tiêu đề cột (skiprows=1)
+    df = pd.read_excel("DATA Trạm.xlsx", sheet_name="Data", skiprows=1)
     return df
 
 try:
     df_raw = load_data()
 
-    # 2. Tiền xử lý dữ liệu để đảm bảo các ô trống không gây lỗi
+    # Tạo bản sao dữ liệu
     df_clean = df_raw.copy()
 
-    # Chuyển đổi cột Lat và Long (Cột T và U) sang kiểu số
-    df_clean.iloc[:, 19] = pd.to_numeric(df_clean.iloc[:, 19], errors='coerce')
-    df_clean.iloc[:, 20] = pd.to_numeric(df_clean.iloc[:, 20], errors='coerce')
+    # Tìm chính xác cột Lat và Long
+    lat_col = 'Lat' if 'Lat' in df_clean.columns else df_clean.columns[19]
+    long_col = 'Long' if 'Long' in df_clean.columns else df_clean.columns[20]
 
-    # Loại bỏ các hàng mà dữ liệu Lat hoặc Long bị trống (NaN)
-    # df_clean.columns[19] là tên cột T, df_clean.columns[20] là tên cột U
-    df_clean = df_clean.dropna(subset=[df_clean.columns[19], df_clean.columns[20]])
+    # Chuyển đổi dữ liệu cột Lat và Long sang kiểu số (float)
+    df_clean[lat_col] = pd.to_numeric(df_clean[lat_col], errors='coerce')
+    df_clean[long_col] = pd.to_numeric(df_clean[long_col], errors='coerce')
 
-    # 3. Nhập tọa độ cần tra cứu
-    # Bạn có thể điều chỉnh giá trị mặc định (value=...) tại đây
+    # Loại bỏ các hàng có tọa độ trống (NaN)
+    df_clean = df_clean.dropna(subset=[lat_col, long_col])
+
+    # 2. Ô nhập tọa độ cần tra cứu
     input_lat = st.number_input("Nhập LATITUDE (Vĩ độ):", format="%.6f", value=10.584259)
     input_lng = st.number_input("Nhập LONGITUDE (Kinh độ):", format="%.6f", value=107.058034)
 
     if st.button("Tính khoảng cách", type="primary"):
         with st.spinner('Đang tính toán khoảng cách...'):
-            # Chuyển đổi tọa độ nhập vào và tọa độ trong dữ liệu sang Radians
-            lat1, lon1 = np.radians(input_lat), np.radians(input_lng)
-            lat2 = np.radians(df_clean.iloc[:, 19])
-            lon2 = np.radians(df_clean.iloc[:, 20])
+            # Chuyển đổi tọa độ nhập vào và mảng dữ liệu sang Radians
+            lat1 = np.radians(float(input_lat))
+            lon1 = np.radians(float(input_lng))
+            
+            # Ép kiểu mảng NumPy float để tránh lỗi ufunc radians
+            lat2 = np.radians(df_clean[lat_col].values.astype(float))
+            lon2 = np.radians(df_clean[long_col].values.astype(float))
 
-            # Công thức Haversine để tính khoảng cách (mét)
+            # Công thức Haversine tính khoảng cách (mét) tương đương cột W
             dlat = lat2 - lat1
             dlon = lon2 - lon1
             a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
             c = 2 * np.arcsin(np.sqrt(a))
-            r = 6371000  # Bán kính Trái Đất (m) - trùng công thức ô W3
+            r = 6371000  # Bán kính Trái Đất (m)
             
-            # Gán kết quả tính toán (Khoảng cách tính bằng mét)
+            # Gán kết quả khoảng cách
             df_clean['Khoảng cách (m)'] = c * r
 
-            # Sắp xếp để lấy 5 kết quả gần nhất (tương đương H3:H7)
-            top5 = df_clean.sort_values(by='Khoảng cách (m)').head(5)
+            # Lấy 5 trạm có khoảng cách nhỏ nhất
+            top5 = df_clean.sort_values(by='Khoảng cách (m)').head(5).copy()
 
             st.subheader("🎯 Kết quả 5 trạm gần nhất:")
             
-            # Hiển thị bảng kết quả với định dạng rõ ràng
-            # Bạn có thể điều chỉnh danh sách và thứ tự các cột hiển thị tại đây
-            display_cols = ['Khoảng cách (m)', 'Mã trạm theo SU', 'Tên trạm', 'Lat', 'Long', 'Địa chỉ', 'Tỉnh']
-            cols_to_show = [c for c in display_cols if c in top5.columns]
+            # Chọn các cột cần hiển thị
+            cols_priority = ['Khoảng cách (m)', 'Mã trạm theo SU', 'Tên trạm', 'Địa chỉ', 'Tỉnh', lat_col, long_col]
+            cols_to_show = [c for c in cols_priority if c in top5.columns]
             
-            # Nếu không tìm thấy các tên cột chuẩn, hiển thị tất cả các cột
             if not cols_to_show:
                 cols_to_show = top5.columns
 
-            # reset_index(drop=True) để hiển thị STT từ 0 đến 4
+            # Định dạng lại khoảng cách hiển thị làm tròn 2 chữ số thập phân
+            top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
+
             st.dataframe(top5[cols_to_show].reset_index(drop=True), use_container_width=True)
 
 except FileNotFoundError:
-    st.error("Không tìm thấy file dữ liệu 'DATA Trạm.xlsx'. Bạn hãy đảm bảo file này đã được tải lên cùng thư mục với file `.py`.")
+    st.error("Không tìm thấy file 'DATA Trạm.xlsx'. Bạn hãy đảm bảo file này đã được tải lên cùng thư mục trên GitHub.")
 except Exception as e:
-    st.error(f"Đã xảy ra lỗi không xác định. Có thể file 'DATA Trạm.xlsx' có cấu trúc không đúng hoặc bị lỗi: {e}")
+    st.error(f"Đã xảy ra lỗi: {e}")
