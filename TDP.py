@@ -80,56 +80,105 @@ try:
                     # Định dạng làm tròn khoảng cách 2 chữ số thập phân
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
 
-                    # Đổi tên các cột hiển thị
-                    rename_map = {
-                        col_ten_tram: 'Tên Trạm',
-                        col_ma_tram: 'Mã Trạm',
-                        col_trang_thai: 'Trạng Thái',
-                        col_tinh: 'Tỉnh',
-                        col_mien_dia_ly: 'Miền Địa Lý',
-                        col_lat: 'Lat',
-                        col_long: 'Long'
-                    }
-                    top5 = top5.rename(columns=rename_map)
-
-                    # Ép Lat, Long sang kiểu chuỗi để giữ nguyên chính xác tất cả số thập phân
-                    top5['Lat'] = top5['Lat'].astype(str)
-                    top5['Long'] = top5['Long'].astype(str)
-
-                    # Cột chứa dữ liệu thực tế để copy
-                    top5['Tọa độ Copy (Lat, Long)'] = top5.apply(
-                        lambda r: f"{r['Lat']}, {r['Long']}", axis=1
-                    )
-
-                    # Thứ tự các cột hiển thị
-                    output_cols = [
-                        'Khoảng cách (m)', 
-                        'Tên Trạm', 
-                        'Mã Trạm', 
-                        'Trạng Thái', 
-                        'Tỉnh', 
-                        'Miền Địa Lý', 
-                        'Lat', 
-                        'Long', 
-                        'Tọa độ Copy (Lat, Long)'
-                    ]
-                    
-                    cols_to_display = [col for col in output_cols if col in top5.columns]
-
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
-                    
-                    # Bảng Kẻ Khung với Cột Copy gọn gàng (Chỉ hiện Biểu tượng 📋 Copy)
-                    st.dataframe(
-                        top5[cols_to_display].reset_index(drop=True),
-                        use_container_width=True,
-                        column_config={
-                            "Tọa độ Copy (Lat, Long)": st.column_config.TextColumn(
-                                "Tọa độ Copy (Lat, Long)",
-                                help="Rê chuột/Bấm vào biểu tượng 📋 ở góc ô để copy tọa độ",
-                                default="📋 Copy"
-                            )
+
+                    # Mã HTML tạo bảng kẻ khung đẹp mắt, ẩn Index và có Nút bấm Copy tự động
+                    html_code = """
+                    <style>
+                        .custom-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin: 10px 0;
+                            font-family: Arial, sans-serif;
+                            font-size: 14px;
+                            color: #ffffff;
                         }
-                    )
+                        .custom-table th {
+                            background-color: #262730;
+                            color: #fafafa;
+                            text-align: left;
+                            padding: 12px;
+                            border: 1px solid #41444C;
+                        }
+                        .custom-table td {
+                            padding: 10px 12px;
+                            border: 1px solid #41444C;
+                            background-color: #0e1117;
+                        }
+                        .copy-btn {
+                            background-color: #ff4b4b;
+                            color: white;
+                            border: none;
+                            padding: 6px 12px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-weight: bold;
+                            font-size: 13px;
+                            transition: 0.2s;
+                        }
+                        .copy-btn:hover {
+                            background-color: #d33a3a;
+                        }
+                    </style>
+
+                    <script>
+                    function copyToClipboard(text, btn) {
+                        navigator.clipboard.writeText(text).then(function() {
+                            var originalText = btn.innerHTML;
+                            btn.innerHTML = "✅ Đã Copy!";
+                            btn.style.backgroundColor = "#28a745";
+                            setTimeout(function() {
+                                btn.innerHTML = originalText;
+                                btn.style.backgroundColor = "#ff4b4b";
+                            }, 1500);
+                        });
+                    }
+                    </script>
+
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Khoảng cách (m)</th>
+                                <th>Tên Trạm</th>
+                                <th>Mã Trạm</th>
+                                <th>Trạng Thái</th>
+                                <th>Tỉnh</th>
+                                <th>Miền Địa Lý</th>
+                                <th>Lat</th>
+                                <th>Long</th>
+                                <th style="text-align: center;">Tọa độ Copy (Lat, Long)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    """
+
+                    for _, row in top5.iterrows():
+                        lat_val = str(row[col_lat])
+                        long_val = str(row[col_long])
+                        coord_str = f"{lat_val}, {long_val}"
+                        
+                        html_code += f"""
+                            <tr>
+                                <td><b>{row['Khoảng cách (m)']}</b></td>
+                                <td>{row[col_ten_tram]}</td>
+                                <td>{row[col_ma_tram]}</td>
+                                <td>{row[col_trang_thai]}</td>
+                                <td>{row[col_tinh]}</td>
+                                <td>{row[col_mien_dia_ly]}</td>
+                                <td>{lat_val}</td>
+                                <td>{long_val}</td>
+                                <td style="text-align: center;">
+                                    <button class="copy-btn" onclick="copyToClipboard('{coord_str}', this)">📋 Copy</button>
+                                </td>
+                            </tr>
+                        """
+
+                    html_code += """
+                        </tbody>
+                    </table>
+                    """
+
+                    st.components.v1.html(html_code, height=320, scrolling=True)
 
             except ValueError:
                 st.error("Tọa độ nhập vào không hợp lệ. Vui lòng đảm bảo chỉ nhập số, ví dụ: 10.734728, 106.663666")
