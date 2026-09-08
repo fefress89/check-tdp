@@ -74,8 +74,18 @@ try:
                     # Gán kết quả khoảng cách
                     df_clean['Khoảng cách (m)'] = c * r
 
-                    # Lấy 5 trạm có khoảng cách nhỏ nhất
-                    top5 = df_clean.sort_values(by='Khoảng cách (m)').head(5).copy()
+                    # 3. Sắp xếp theo khoảng cách tăng dần
+                    df_sorted = df_clean.sort_values(by='Khoảng cách (m)').copy()
+
+                    # Danh sách các cột cần kiểm tra trùng lặp thông tin
+                    check_cols = [col_ten_tram, col_ma_tram, col_trang_thai, col_tinh, col_mien_dia_ly, col_lat, col_long]
+                    existing_cols = [c for c in check_cols if c in df_sorted.columns]
+
+                    # Loại bỏ các dòng trùng thông tin hoàn toàn, chỉ giữ lại dòng đầu tiên
+                    df_dedup = df_sorted.drop_duplicates(subset=existing_cols, keep='first').copy()
+
+                    # Lấy đúng 5 kết quả độc nhất gần nhất
+                    top5 = df_dedup.head(5).copy()
 
                     # Định dạng làm tròn khoảng cách 2 chữ số thập phân
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
