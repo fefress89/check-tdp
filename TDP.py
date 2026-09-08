@@ -21,18 +21,23 @@ try:
     df_raw = load_data()
     df_clean = df_raw.copy()
 
-    # Tìm chính xác cột Lat và Long
-    lat_col = 'Lat' if 'Lat' in df_clean.columns else df_clean.columns[19]
-    long_col = 'Long' if 'Long' in df_clean.columns else df_clean.columns[20]
+    # Xác định vị trí cột theo tên hoặc theo thứ tự cột Excel (G, F/H, O, S, P, T, U)
+    col_ten_tram = 'Tên trạm' if 'Tên trạm' in df_clean.columns else df_clean.columns[6]       # Cột G
+    col_ma_tram = 'Mã trạm theo SU' if 'Mã trạm theo SU' in df_clean.columns else df_clean.columns[5] # Cột F/H
+    col_trang_thai = 'Trạng thái' if 'Trạng thái' in df_clean.columns else df_clean.columns[14] # Cột O
+    col_mien_dia_ly = 'Miền địa lý' if 'Miền địa lý' in df_clean.columns else df_clean.columns[18] # Cột S
+    col_dia_chi = 'Địa chỉ' if 'Địa chỉ' in df_clean.columns else df_clean.columns[15]         # Cột P
+    col_lat = 'Lat' if 'Lat' in df_clean.columns else df_clean.columns[19]                     # Cột T
+    col_long = 'Long' if 'Long' in df_clean.columns else df_clean.columns[20]                  # Cột U
 
     # Chuyển đổi dữ liệu cột Lat và Long sang kiểu số (float)
-    df_clean[lat_col] = pd.to_numeric(df_clean[lat_col], errors='coerce')
-    df_clean[long_col] = pd.to_numeric(df_clean[long_col], errors='coerce')
+    df_clean[col_lat] = pd.to_numeric(df_clean[col_lat], errors='coerce')
+    df_clean[col_long] = pd.to_numeric(df_clean[col_long], errors='coerce')
 
     # Loại bỏ các hàng có tọa độ trống (NaN)
-    df_clean = df_clean.dropna(subset=[lat_col, long_col])
+    df_clean = df_clean.dropna(subset=[col_lat, col_long])
 
-    # 2. Ô dán tọa độ duy nhất (Dán cả LAT, LONG vào đây)
+    # 2. Ô dán tọa độ duy nhất
     raw_coord = st.text_input(
         "Dán tọa độ LATITUDE, LONGITUDE vào đây:",
         value="10.734728, 106.663666",
@@ -40,7 +45,6 @@ try:
     )
 
     if st.button("Tính khoảng cách", type="primary"):
-        # Tách chuỗi nhập vào theo dấu phẩy hoặc khoảng trắng
         clean_input = raw_coord.strip().replace('\t', ',')
         
         if ',' in clean_input:
@@ -58,8 +62,8 @@ try:
                     lat1 = np.radians(input_lat)
                     lon1 = np.radians(input_lng)
                     
-                    lat2 = np.radians(df_clean[lat_col].values.astype(float))
-                    lon2 = np.radians(df_clean[long_col].values.astype(float))
+                    lat2 = np.radians(df_clean[col_lat].values.astype(float))
+                    lon2 = np.radians(df_clean[col_long].values.astype(float))
 
                     # Công thức Haversine tính khoảng cách (mét) tương đương cột W
                     dlat = lat2 - lat1
@@ -74,24 +78,37 @@ try:
                     # Lấy 5 trạm có khoảng cách nhỏ nhất
                     top5 = df_clean.sort_values(by='Khoảng cách (m)').head(5).copy()
 
-                    st.subheader("🎯 Kết quả 5 trạm gần nhất:")
-                    
-                    # Chọn các cột hiển thị
-                    cols_priority = ['Khoảng cách (m)', 'Mã trạm theo SU', 'Tên trạm', 'Địa chỉ', 'Tỉnh', lat_col, long_col]
-                    cols_to_show = [c for c in cols_priority if c in top5.columns]
-                    
-                    if not cols_to_show:
-                        cols_to_show = top5.columns
-
-                    # Làm tròn khoảng cách đến 2 chữ số thập phân
+                    # Định dạng làm tròn khoảng cách 2 chữ số thập phân
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
 
-                    st.dataframe(top5[cols_to_show].reset_index(drop=True), use_container_width=True)
+                    # Tạo cột STT bắt đầu từ 1 đến 5
+                    top5['STT'] = range(1, len(top5) + 1)
+
+                    # Đổi tên cột hiển thị cho gọn gàng và chuẩn xác
+                    rename_map = {
+                        col_ten_tram: 'Tên Trạm',
+                        col_ma_tram: 'Mã Trạm',
+                        col_trang_thai: 'Trạng Thái',
+                        col_mien_dia_ly: 'Miền Địa Lý',
+                        col_dia_chi: 'Địa Chỉ',
+                        col_lat: 'Lat',
+                        col_long: 'Long'
+                    }
+                    top5 = top5.rename(columns=rename_map)
+
+                    # Thứ tự các cột hiển thị ra màn hình
+                    output_cols = ['STT', 'Khoảng cách (m)', 'Tên Trạm', 'Mã Trạm', 'Trạng Thái', 'Miền Địa Lý', 'Địa Chỉ', 'Lat', 'Long']
+                    
+                    # Lọc lấy các cột tồn tại
+                    cols_to_display = [col for col in output_cols if col in top5.columns]
+
+                    st.subheader("🎯 Kết quả 5 trạm gần nhất:")
+                    st.dataframe(top5[cols_to_display].reset_index(drop=True), use_container_width=True)
 
             except ValueError:
                 st.error("Tọa độ nhập vào không hợp lệ. Vui lòng đảm bảo chỉ nhập số, ví dụ: 10.734728, 106.663666")
         else:
-            st.warning("Vui lòng nhập đầy đủ cả Vĩ độ và Kinh độ phân tách bởi dấu phẩy (ví dụ: 10.734728, 106.663666).")
+            st.warning("Vui lòng nhập đầy đủ cả Vĩ độ và Kinh độ phân tách bởi dấu phẩy.")
 
 except FileNotFoundError:
     st.error("Không tìm thấy file 'DATA Trạm.xlsx'. Bạn hãy đảm bảo file này đã được tải lên cùng thư mục trên GitHub.")
