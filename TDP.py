@@ -82,7 +82,7 @@ try:
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
 
-                    # Mã HTML tạo bảng kẻ khung đẹp mắt, ẩn Index và có Nút bấm Copy tự động
+                    # Mã HTML tạo bảng kẻ khung, hiển thị cột Index 0, 1, 2, 3, 4 và nút Copy
                     html_code = """
                     <style>
                         .custom-table {
@@ -138,6 +138,7 @@ try:
                     <table class="custom-table">
                         <thead>
                             <tr>
+                                <th style="width: 50px;"></th>
                                 <th>Khoảng cách (m)</th>
                                 <th>Tên Trạm</th>
                                 <th>Mã Trạm</th>
@@ -152,13 +153,14 @@ try:
                         <tbody>
                     """
 
-                    for _, row in top5.iterrows():
+                    for idx, (_, row) in enumerate(top5.iterrows()):
                         lat_val = str(row[col_lat])
                         long_val = str(row[col_long])
                         coord_str = f"{lat_val}, {long_val}"
                         
                         html_code += f"""
                             <tr>
+                                <td style="text-align: center; color: #888888; font-weight: bold;">{idx}</td>
                                 <td><b>{row['Khoảng cách (m)']}</b></td>
                                 <td>{row[col_ten_tram]}</td>
                                 <td>{row[col_ma_tram]}</td>
