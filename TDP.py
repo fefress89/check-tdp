@@ -14,21 +14,34 @@ st.title("📍 Tra cứu khoảng cách trạm gần nhất")
 @st.cache_data
 def load_data():
     df = pd.read_excel("DATA Trạm.xlsx", sheet_name="Data", skiprows=1)
+    # Chuẩn hóa tên cột (xóa khoảng trắng thừa)
+    df.columns = [str(c).strip() for c in df.columns]
     return df
 
 try:
     df_raw = load_data()
     df_clean = df_raw.copy()
 
-    # Xác định vị trí cột theo tên hoặc chỉ số cột Excel
-    col_pic_ptml = 'PIC PTML' if 'PIC PTML' in df_clean.columns else df_clean.columns[4]         # Cột E (Loại trạm)
-    col_ten_tram = 'Tên trạm' if 'Tên trạm' in df_clean.columns else df_clean.columns[6]          # Cột G
-    col_ma_tram = 'Mã trạm theo SU' if 'Mã trạm theo SU' in df_clean.columns else df_clean.columns[5] # Cột F/H
-    col_trang_thai = 'Trạng thái' if 'Trạng thái' in df_clean.columns else df_clean.columns[14]   # Cột O
-    col_tinh = 'Tỉnh' if 'Tỉnh' in df_clean.columns else df_clean.columns[17]                     # Cột R
-    col_mien_dia_ly = 'Miền địa lý' if 'Miền địa lý' in df_clean.columns else df_clean.columns[18]   # Cột S
-    col_lat = 'Lat' if 'Lat' in df_clean.columns else df_clean.columns[19]                        # Cột T
-    col_long = 'Long' if 'Long' in df_clean.columns else df_clean.columns[20]                     # Cột U
+    # Hàm tìm cột linh hoạt theo danh sách tên gọi có thể có
+    def get_col_name(df, possible_names, fallback_index):
+        for name in possible_names:
+            for col in df.columns:
+                if name.lower() == str(col).lower():
+                    return col
+        if fallback_index < len(df.columns):
+            return df.columns[fallback_index]
+        return None
+
+    # Xác định các cột dữ liệu
+    col_pic_ptml = get_col_name(df_clean, ['PIC PTML', 'PIC_PTML'], 4)         # Cột E
+    col_phan_loai = get_col_name(df_clean, ['Phân loại', 'Phan loai'], 1)       # Cột B
+    col_ten_tram = get_col_name(df_clean, ['Tên trạm', 'Ten tram'], 6)          # Cột G
+    col_ma_tram = get_col_name(df_clean, ['Mã trạm theo SU', 'Mã trạm'], 5)    # Cột F
+    col_trang_thai = get_col_name(df_clean, ['Trạng thái', 'Trang thai'], 14)   # Cột O
+    col_tinh = get_col_name(df_clean, ['Tỉnh', 'Tinh'], 17)                     # Cột R
+    col_mien_dia_ly = get_col_name(df_clean, ['Miền địa lý', 'Mien dia ly'], 18)# Cột S
+    col_lat = get_col_name(df_clean, ['Lat', 'LAT', 'Latitude'], 19)            # Cột T
+    col_long = get_col_name(df_clean, ['Long', 'LONG', 'Longitude'], 20)        # Cột U
 
     # Chuyển đổi dữ liệu cột Lat và Long sang kiểu số (float)
     df_clean[col_lat] = pd.to_numeric(df_clean[col_lat], errors='coerce')
@@ -79,8 +92,8 @@ try:
                     df_sorted = df_clean.sort_values(by='Khoảng cách (m)').copy()
 
                     # Danh sách các cột cần kiểm tra trùng lặp thông tin
-                    check_cols = [col_ten_tram, col_ma_tram, col_trang_thai, col_pic_ptml, col_tinh, col_mien_dia_ly, col_lat, col_long]
-                    existing_cols = [c for c in check_cols if c in df_sorted.columns]
+                    check_cols = [col_ten_tram, col_ma_tram, col_trang_thai, col_tinh, col_mien_dia_ly, col_lat, col_long]
+                    existing_cols = [c for c in check_cols if c and c in df_sorted.columns]
 
                     # Loại bỏ các dòng trùng thông tin hoàn toàn, chỉ giữ lại dòng đầu tiên
                     df_dedup = df_sorted.drop_duplicates(subset=existing_cols, keep='first').copy()
@@ -93,7 +106,7 @@ try:
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
 
-                    # Mã HTML tạo bảng kẻ khung, hiển thị các cột theo đúng thứ tự
+                    # Mã HTML tạo bảng kẻ khung
                     html_code = """
                     <style>
                         .custom-table {
@@ -169,8 +182,16 @@ try:
                         lat_val = str(row[col_lat])
                         long_val = str(row[col_long])
                         coord_str = f"{lat_val}, {long_val}"
-                        loai_tram_val = str(row[col_pic_ptml]) if pd.notna(row[col_pic_ptml]) else ""
                         
+                        # Ưu tiên lấy dữ liệu từ PIC PTML (cột E), nếu trống thì thử lấy Phân loại (cột B)
+                        loai_tram_val = ""
+                        if col_pic_ptml in row and pd.notna(row[col_pic_ptml]) and str(row[col_pic_ptml]).strip() != "":
+                            loai_tram_val = str(row[col_pic_ptml]).strip()
+                        elif col_phan_loai in row and pd.notna(row[col_phan_loai]) and str(row[col_phan_loai]).strip() != "":
+                            loai_tram_val = str(row[col_phan_loai]).strip()
+                        else:
+                            loai_tram_val = "-"
+
                         html_code += f"""
                             <tr>
                                 <td style="text-align: center; color: #888888; font-weight: bold;">{idx}</td>
