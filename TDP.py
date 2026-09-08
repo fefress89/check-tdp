@@ -20,7 +20,7 @@ try:
     df_raw = load_data()
     df_clean = df_raw.copy()
 
-    # Xác định vị trí cột
+    # Xác định vị trí cột theo tên hoặc chỉ số cột Excel
     col_ten_tram = 'Tên trạm' if 'Tên trạm' in df_clean.columns else df_clean.columns[6]          # Cột G
     col_ma_tram = 'Mã trạm theo SU' if 'Mã trạm theo SU' in df_clean.columns else df_clean.columns[5] # Cột F/H
     col_trang_thai = 'Trạng thái' if 'Trạng thái' in df_clean.columns else df_clean.columns[14]   # Cột O
@@ -77,38 +77,52 @@ try:
                     # Lấy 5 trạm có khoảng cách nhỏ nhất
                     top5 = df_clean.sort_values(by='Khoảng cách (m)').head(5).copy()
 
-                    # Định dạng khoảng cách làm tròn 2 chữ số thập phân
+                    # Định dạng làm tròn khoảng cách 2 chữ số thập phân
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
 
-                    # Chuẩn bị dữ liệu hiển thị (Bỏ cột STT)
-                    top5_display = pd.DataFrame({
-                        'Khoảng cách (m)': top5['Khoảng cách (m)'],
-                        'Tên Trạm': top5[col_ten_tram],
-                        'Mã Trạm': top5[col_ma_tram],
-                        'Trạng Thái': top5[col_trang_thai],
-                        'Tỉnh': top5[col_tinh],
-                        'Miền Địa Lý': top5[col_mien_dia_ly],
-                        'Lat': top5[col_lat].astype(str),
-                        'Long': top5[col_long].astype(str),
-                        'Tọa độ Copy (Lat, Long)': top5.apply(lambda r: f"{r[col_lat]}, {r[col_long]}", axis=1)
-                    })
+                    # Tạo chuỗi tọa độ để copy (Lat, Long)
+                    top5['Tọa độ Copy (Lat, Long)'] = top5.apply(
+                        lambda r: f"{r[col_lat]}, {r[col_long]}", axis=1
+                    )
+
+                    # Đổi tên các cột hiển thị
+                    rename_map = {
+                        col_ten_tram: 'Tên Trạm',
+                        col_ma_tram: 'Mã Trạm',
+                        col_trang_thai: 'Trạng Thái',
+                        col_tinh: 'Tỉnh',
+                        col_mien_dia_ly: 'Miền Địa Lý',
+                        col_lat: 'Lat',
+                        col_long: 'Long'
+                    }
+                    top5 = top5.rename(columns=rename_map)
+
+                    # Ép Lat, Long sang kiểu chuỗi để giữ nguyên chính xác tất cả số thập phân
+                    top5['Lat'] = top5['Lat'].astype(str)
+                    top5['Long'] = top5['Long'].astype(str)
+
+                    # Thứ tự các cột hiển thị đúng như bảng kẻ khung yêu cầu (Không có STT)
+                    output_cols = [
+                        'Khoảng cách (m)', 
+                        'Tên Trạm', 
+                        'Mã Trạm', 
+                        'Trạng Thái', 
+                        'Tỉnh', 
+                        'Miền Địa Lý', 
+                        'Lat', 
+                        'Long', 
+                        'Tọa độ Copy (Lat, Long)'
+                    ]
+                    
+                    cols_to_display = [col for col in output_cols if col in top5.columns]
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
                     
-                    # Hiển thị từng dòng với nút Bấm Copy 1-Click
-                    for i, row in top5_display.reset_index(drop=True).iterrows():
-                        cols = st.columns([1.2, 2.5, 1.5, 1.2, 1.2, 1.2, 1.5, 1.5, 2])
-                        cols[0].write(f"**{row['Khoảng cách (m)']} m**")
-                        cols[1].write(row['Tên Trạm'])
-                        cols[2].write(row['Mã Trạm'])
-                        cols[3].write(row['Trạng Thái'])
-                        cols[4].write(row['Tỉnh'])
-                        cols[5].write(row['Miền Địa Lý'])
-                        cols[6].write(row['Lat'])
-                        cols[7].write(row['Long'])
-                        
-                        # Nút copy 1 click trực tiếp sử dụng st.code
-                        cols[8].code(row['Tọa độ Copy (Lat, Long)'], language=None)
+                    # Bảng Kẻ Khung nguyên bản với ô Copy nhanh chuẩn Streamlit
+                    st.dataframe(
+                        top5[cols_to_display].reset_index(drop=True),
+                        use_container_width=True
+                    )
 
             except ValueError:
                 st.error("Tọa độ nhập vào không hợp lệ. Vui lòng đảm bảo chỉ nhập số, ví dụ: 10.734728, 106.663666")
