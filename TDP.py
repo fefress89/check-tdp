@@ -101,10 +101,9 @@ try:
                     # Sắp xếp theo khoảng cách
                     df_sorted = df_clean.sort_values(by='Khoảng cách (m)').copy()
 
-                    # Hàm gom nhóm dữ liệu trùng Mã Trạm / Tọa độ để kết hợp Loại Trạm bằng dấu &
+                    # Hàm gom nhóm dữ liệu trùng
                     def combine_unique(series):
                         vals = [str(v).strip() for v in series if pd.notna(v) and str(v).strip() not in ['', '-']]
-                        # Lọc trùng giữ thứ tự
                         seen = set()
                         unique_vals = []
                         for v in vals:
@@ -113,7 +112,6 @@ try:
                                 unique_vals.append(v)
                         return " & ".join(unique_vals) if unique_vals else "-"
 
-                    # Nhóm theo Mã trạm (hoặc Tên trạm + Lat + Long)
                     group_cols = [col_ma_tram, col_lat, col_long]
                     existing_group_cols = [c for c in group_cols if c in df_sorted.columns]
 
@@ -126,19 +124,22 @@ try:
                         col_mien_dia_ly: 'first',
                     })
 
-                    # Lấy 5 trạm độc nhất đầu tiên
                     top5 = grouped.head(5).copy()
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
 
-                    # Mã HTML hiển thị bảng
+                    # Mã HTML hiển thị bảng thích ứng mọi màn hình, không bị xé/xuất hiện scrollbar
                     html_code = """
                     <style>
+                        .table-container {
+                            width: 100%;
+                            overflow-x: auto;
+                            margin: 10px 0;
+                        }
                         .custom-table {
                             width: 100%;
                             border-collapse: collapse;
-                            margin: 10px 0;
                             font-family: Arial, sans-serif;
                             font-size: 14px;
                             color: #ffffff;
@@ -147,13 +148,15 @@ try:
                             background-color: #262730;
                             color: #fafafa;
                             text-align: left;
-                            padding: 12px;
+                            padding: 10px 12px;
                             border: 1px solid #41444C;
+                            white-space: nowrap;
                         }
                         .custom-table td {
                             padding: 10px 12px;
                             border: 1px solid #41444C;
                             background-color: #0e1117;
+                            vertical-align: middle;
                         }
                         .copy-btn {
                             background-color: #ff4b4b;
@@ -164,6 +167,7 @@ try:
                             cursor: pointer;
                             font-weight: bold;
                             font-size: 13px;
+                            white-space: nowrap;
                             transition: 0.2s;
                         }
                         .copy-btn:hover {
@@ -185,23 +189,24 @@ try:
                     }
                     </script>
 
-                    <table class="custom-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 50px;"></th>
-                                <th>Khoảng cách (m)</th>
-                                <th>Tên Trạm</th>
-                                <th>Mã Trạm</th>
-                                <th>Trạng Thái</th>
-                                <th>Loại Trạm</th>
-                                <th>Tỉnh</th>
-                                <th>Miền Địa Lý</th>
-                                <th>Lat</th>
-                                <th>Long</th>
-                                <th style="text-align: center;">Tọa độ Copy (Lat, Long)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div class="table-container">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px; text-align: center;"></th>
+                                    <th>Khoảng cách (m)</th>
+                                    <th>Tên Trạm</th>
+                                    <th>Mã Trạm</th>
+                                    <th>Trạng Thái</th>
+                                    <th>Loại Trạm</th>
+                                    <th>Tỉnh</th>
+                                    <th>Miền Địa Lý</th>
+                                    <th>Lat</th>
+                                    <th>Long</th>
+                                    <th style="text-align: center;">Tọa độ Copy (Lat, Long)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                     """
 
                     for idx, (_, row) in enumerate(top5.iterrows()):
@@ -229,11 +234,12 @@ try:
                         """
 
                     html_code += """
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                     """
 
-                    st.components.v1.html(html_code, height=320, scrolling=True)
+                    st.components.v1.html(html_code, height=500, scrolling=False)
 
             except ValueError:
                 st.error("Tọa độ nhập vào không hợp lệ. Vui lòng đảm bảo chỉ nhập số, ví dụ: 10.734728, 106.663666")
