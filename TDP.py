@@ -32,8 +32,7 @@ try:
         return None
 
     # Xác định tên các cột dữ liệu
-    col_pic_ptml = get_col_name(df_clean, ['PIC PTML', 'PIC_PTML'], 4)         # Cột E
-    col_phan_loai = get_col_name(df_clean, ['Phân loại', 'Phan loai'], 1)       # Cột B
+    col_phan_loai = get_col_name(df_clean, ['Phân loại', 'Phan loai'], 1)       # Cột B (Loại Trạm)
     col_ten_tram = get_col_name(df_clean, ['Tên trạm', 'Ten tram'], 6)          # Cột G
     col_ma_tram = get_col_name(df_clean, ['Mã trạm theo SU', 'Mã trạm'], 5)    # Cột F
     col_trang_thai = get_col_name(df_clean, ['Trạng thái', 'Trang thai'], 14)   # Cột O
@@ -49,15 +48,10 @@ try:
     # Loại bỏ các hàng có tọa độ trống
     df_clean = df_clean.dropna(subset=[col_lat, col_long])
 
-    # Tạo giá trị Loại Trạm cho từng hàng
+    # Trích xuất Loại Trạm chỉ từ cột B (Phân loại)
     def extract_loai_tram(row):
-        val_e = str(row[col_pic_ptml]).strip() if col_pic_ptml in row and pd.notna(row[col_pic_ptml]) else ""
         val_b = str(row[col_phan_loai]).strip() if col_phan_loai in row and pd.notna(row[col_phan_loai]) else ""
-        if val_e != "":
-            return val_e
-        elif val_b != "":
-            return val_b
-        return ""
+        return val_b
 
     df_clean['Loại Trạm Temp'] = df_clean.apply(extract_loai_tram, axis=1)
 
@@ -129,7 +123,7 @@ try:
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
 
-                    # Mã HTML hiển thị bảng thích ứng mọi màn hình, không bị xé/xuất hiện scrollbar
+                    # Mã HTML hiển thị bảng
                     html_code = """
                     <style>
                         .table-container {
