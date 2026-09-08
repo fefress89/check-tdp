@@ -13,7 +13,6 @@ st.title("📍 Tra cứu khoảng cách trạm gần nhất")
 # 1. Tải dữ liệu Data nền từ file Excel
 @st.cache_data
 def load_data():
-    # Đọc sheet 'Data', dòng 2 là tiêu đề cột (skiprows=1)
     df = pd.read_excel("DATA Trạm.xlsx", sheet_name="Data", skiprows=1)
     return df
 
@@ -21,7 +20,7 @@ try:
     df_raw = load_data()
     df_clean = df_raw.copy()
 
-    # Xác định chính xác các cột dựa trên tên hoặc vị trí
+    # Xác định vị trí cột
     col_ten_tram = 'Tên trạm' if 'Tên trạm' in df_clean.columns else df_clean.columns[6]          # Cột G
     col_ma_tram = 'Mã trạm theo SU' if 'Mã trạm theo SU' in df_clean.columns else df_clean.columns[5] # Cột F/H
     col_trang_thai = 'Trạng thái' if 'Trạng thái' in df_clean.columns else df_clean.columns[14]   # Cột O
@@ -81,48 +80,35 @@ try:
                     # Định dạng khoảng cách làm tròn 2 chữ số thập phân
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
 
-                    # Tạo cột STT từ 1 đến 5
-                    top5['STT'] = range(1, len(top5) + 1)
-
-                    # Tạo chuỗi "latitude, longitude" đầy đủ chữ số thập phân để copy trực tiếp vào Google Maps
-                    top5['Tọa độ Copy (Lat, Long)'] = top5.apply(
-                        lambda r: f"{r[col_lat]}, {r[col_long]}", axis=1
-                    )
-
-                    # Đổi tên cột hiển thị
-                    rename_map = {
-                        col_ten_tram: 'Tên Trạm',
-                        col_ma_tram: 'Mã Trạm',
-                        col_trang_thai: 'Trạng Thái',
-                        col_tinh: 'Tỉnh',
-                        col_mien_dia_ly: 'Miền Địa Lý',
-                        col_lat: 'Lat',
-                        col_long: 'Long'
-                    }
-                    top5 = top5.rename(columns=rename_map)
-
-                    # Đảm bảo giữ nguyên kiểu dữ liệu số thực đầy đủ cho Lat và Long
-                    top5['Lat'] = top5['Lat'].astype(str)
-                    top5['Long'] = top5['Long'].astype(str)
-
-                    # Thứ tự các cột hiển thị đúng như yêu cầu
-                    output_cols = [
-                        'STT', 
-                        'Khoảng cách (m)', 
-                        'Tên Trạm', 
-                        'Mã Trạm', 
-                        'Trạng Thái', 
-                        'Tỉnh', 
-                        'Miền Địa Lý', 
-                        'Lat', 
-                        'Long', 
-                        'Tọa độ Copy (Lat, Long)'
-                    ]
-                    
-                    cols_to_display = [col for col in output_cols if col in top5.columns]
+                    # Chuẩn bị dữ liệu hiển thị (Bỏ cột STT)
+                    top5_display = pd.DataFrame({
+                        'Khoảng cách (m)': top5['Khoảng cách (m)'],
+                        'Tên Trạm': top5[col_ten_tram],
+                        'Mã Trạm': top5[col_ma_tram],
+                        'Trạng Thái': top5[col_trang_thai],
+                        'Tỉnh': top5[col_tinh],
+                        'Miền Địa Lý': top5[col_mien_dia_ly],
+                        'Lat': top5[col_lat].astype(str),
+                        'Long': top5[col_long].astype(str),
+                        'Tọa độ Copy (Lat, Long)': top5.apply(lambda r: f"{r[col_lat]}, {r[col_long]}", axis=1)
+                    })
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
-                    st.dataframe(top5[cols_to_display].reset_index(drop=True), use_container_width=True)
+                    
+                    # Hiển thị từng dòng với nút Bấm Copy 1-Click
+                    for i, row in top5_display.reset_index(drop=True).iterrows():
+                        cols = st.columns([1.2, 2.5, 1.5, 1.2, 1.2, 1.2, 1.5, 1.5, 2])
+                        cols[0].write(f"**{row['Khoảng cách (m)']} m**")
+                        cols[1].write(row['Tên Trạm'])
+                        cols[2].write(row['Mã Trạm'])
+                        cols[3].write(row['Trạng Thái'])
+                        cols[4].write(row['Tỉnh'])
+                        cols[5].write(row['Miền Địa Lý'])
+                        cols[6].write(row['Lat'])
+                        cols[7].write(row['Long'])
+                        
+                        # Nút copy 1 click trực tiếp sử dụng st.code
+                        cols[8].code(row['Tọa độ Copy (Lat, Long)'], language=None)
 
             except ValueError:
                 st.error("Tọa độ nhập vào không hợp lệ. Vui lòng đảm bảo chỉ nhập số, ví dụ: 10.734728, 106.663666")
