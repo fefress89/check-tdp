@@ -21,14 +21,14 @@ try:
     df_raw = load_data()
     df_clean = df_raw.copy()
 
-    # Xác định vị trí cột theo tên hoặc theo thứ tự cột Excel (G, F/H, O, S, P, T, U)
-    col_ten_tram = 'Tên trạm' if 'Tên trạm' in df_clean.columns else df_clean.columns[6]       # Cột G
+    # Xác định chính xác các cột dựa trên tên hoặc vị trí
+    col_ten_tram = 'Tên trạm' if 'Tên trạm' in df_clean.columns else df_clean.columns[6]          # Cột G
     col_ma_tram = 'Mã trạm theo SU' if 'Mã trạm theo SU' in df_clean.columns else df_clean.columns[5] # Cột F/H
-    col_trang_thai = 'Trạng thái' if 'Trạng thái' in df_clean.columns else df_clean.columns[14] # Cột O
-    col_mien_dia_ly = 'Miền địa lý' if 'Miền địa lý' in df_clean.columns else df_clean.columns[18] # Cột S
-    col_dia_chi = 'Địa chỉ' if 'Địa chỉ' in df_clean.columns else df_clean.columns[15]         # Cột P
-    col_lat = 'Lat' if 'Lat' in df_clean.columns else df_clean.columns[19]                     # Cột T
-    col_long = 'Long' if 'Long' in df_clean.columns else df_clean.columns[20]                  # Cột U
+    col_trang_thai = 'Trạng thái' if 'Trạng thái' in df_clean.columns else df_clean.columns[14]   # Cột O
+    col_tinh = 'Tỉnh' if 'Tỉnh' in df_clean.columns else df_clean.columns[17]                     # Cột R
+    col_mien_dia_ly = 'Miền địa lý' if 'Miền địa lý' in df_clean.columns else df_clean.columns[18]   # Cột S
+    col_lat = 'Lat' if 'Lat' in df_clean.columns else df_clean.columns[19]                        # Cột T
+    col_long = 'Long' if 'Long' in df_clean.columns else df_clean.columns[20]                     # Cột U
 
     # Chuyển đổi dữ liệu cột Lat và Long sang kiểu số (float)
     df_clean[col_lat] = pd.to_numeric(df_clean[col_lat], errors='coerce')
@@ -65,7 +65,7 @@ try:
                     lat2 = np.radians(df_clean[col_lat].values.astype(float))
                     lon2 = np.radians(df_clean[col_long].values.astype(float))
 
-                    # Công thức Haversine tính khoảng cách (mét) tương đương cột W
+                    # Công thức Haversine tính khoảng cách (mét)
                     dlat = lat2 - lat1
                     dlon = lon2 - lon1
                     a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
@@ -78,28 +78,47 @@ try:
                     # Lấy 5 trạm có khoảng cách nhỏ nhất
                     top5 = df_clean.sort_values(by='Khoảng cách (m)').head(5).copy()
 
-                    # Định dạng làm tròn khoảng cách 2 chữ số thập phân
+                    # Định dạng khoảng cách làm tròn 2 chữ số thập phân
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
 
-                    # Tạo cột STT bắt đầu từ 1 đến 5
+                    # Tạo cột STT từ 1 đến 5
                     top5['STT'] = range(1, len(top5) + 1)
 
-                    # Đổi tên cột hiển thị cho gọn gàng và chuẩn xác
+                    # Tạo chuỗi "latitude, longitude" đầy đủ chữ số thập phân để copy trực tiếp vào Google Maps
+                    top5['Tọa độ Copy (Lat, Long)'] = top5.apply(
+                        lambda r: f"{r[col_lat]}, {r[col_long]}", axis=1
+                    )
+
+                    # Đổi tên cột hiển thị
                     rename_map = {
                         col_ten_tram: 'Tên Trạm',
                         col_ma_tram: 'Mã Trạm',
                         col_trang_thai: 'Trạng Thái',
+                        col_tinh: 'Tỉnh',
                         col_mien_dia_ly: 'Miền Địa Lý',
-                        col_dia_chi: 'Địa Chỉ',
                         col_lat: 'Lat',
                         col_long: 'Long'
                     }
                     top5 = top5.rename(columns=rename_map)
 
-                    # Thứ tự các cột hiển thị ra màn hình
-                    output_cols = ['STT', 'Khoảng cách (m)', 'Tên Trạm', 'Mã Trạm', 'Trạng Thái', 'Miền Địa Lý', 'Địa Chỉ', 'Lat', 'Long']
+                    # Đảm bảo giữ nguyên kiểu dữ liệu số thực đầy đủ cho Lat và Long
+                    top5['Lat'] = top5['Lat'].astype(str)
+                    top5['Long'] = top5['Long'].astype(str)
+
+                    # Thứ tự các cột hiển thị đúng như yêu cầu
+                    output_cols = [
+                        'STT', 
+                        'Khoảng cách (m)', 
+                        'Tên Trạm', 
+                        'Mã Trạm', 
+                        'Trạng Thái', 
+                        'Tỉnh', 
+                        'Miền Địa Lý', 
+                        'Lat', 
+                        'Long', 
+                        'Tọa độ Copy (Lat, Long)'
+                    ]
                     
-                    # Lọc lấy các cột tồn tại
                     cols_to_display = [col for col in output_cols if col in top5.columns]
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
