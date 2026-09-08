@@ -14,7 +14,6 @@ st.title("📍 Tra cứu khoảng cách trạm gần nhất")
 @st.cache_data
 def load_data():
     df = pd.read_excel("DATA Trạm.xlsx", sheet_name="Data", skiprows=1)
-    # Chuẩn hóa tên cột (xóa khoảng trắng thừa)
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
@@ -22,7 +21,7 @@ try:
     df_raw = load_data()
     df_clean = df_raw.copy()
 
-    # Hàm tìm cột linh hoạt theo danh sách tên gọi có thể có
+    # Hàm tìm cột linh hoạt
     def get_col_name(df, possible_names, fallback_index):
         for name in possible_names:
             for col in df.columns:
@@ -32,7 +31,7 @@ try:
             return df.columns[fallback_index]
         return None
 
-    # Xác định các cột dữ liệu
+    # Xác định tên các cột dữ liệu
     col_pic_ptml = get_col_name(df_clean, ['PIC PTML', 'PIC_PTML'], 4)         # Cột E
     col_phan_loai = get_col_name(df_clean, ['Phân loại', 'Phan loai'], 1)       # Cột B
     col_ten_tram = get_col_name(df_clean, ['Tên trạm', 'Ten tram'], 6)          # Cột G
@@ -43,12 +42,24 @@ try:
     col_lat = get_col_name(df_clean, ['Lat', 'LAT', 'Latitude'], 19)            # Cột T
     col_long = get_col_name(df_clean, ['Long', 'LONG', 'Longitude'], 20)        # Cột U
 
-    # Chuyển đổi dữ liệu cột Lat và Long sang kiểu số (float)
+    # Chuyển đổi Lat và Long sang số
     df_clean[col_lat] = pd.to_numeric(df_clean[col_lat], errors='coerce')
     df_clean[col_long] = pd.to_numeric(df_clean[col_long], errors='coerce')
 
-    # Loại bỏ các hàng có tọa độ trống (NaN)
+    # Loại bỏ các hàng có tọa độ trống
     df_clean = df_clean.dropna(subset=[col_lat, col_long])
+
+    # Tạo giá trị Loại Trạm cho từng hàng
+    def extract_loai_tram(row):
+        val_e = str(row[col_pic_ptml]).strip() if col_pic_ptml in row and pd.notna(row[col_pic_ptml]) else ""
+        val_b = str(row[col_phan_loai]).strip() if col_phan_loai in row and pd.notna(row[col_phan_loai]) else ""
+        if val_e != "":
+            return val_e
+        elif val_b != "":
+            return val_b
+        return ""
+
+    df_clean['Loại Trạm Temp'] = df_clean.apply(extract_loai_tram, axis=1)
 
     # 2. Ô dán tọa độ duy nhất
     raw_coord = st.text_input(
@@ -71,42 +82,57 @@ try:
                 input_lng = float(parts[1])
 
                 with st.spinner('Đang tính toán khoảng cách...'):
-                    # Chuyển đổi tọa độ nhập vào và mảng dữ liệu sang Radians
+                    # Chuyển đổi Radians
                     lat1 = np.radians(input_lat)
                     lon1 = np.radians(input_lng)
                     
                     lat2 = np.radians(df_clean[col_lat].values.astype(float))
                     lon2 = np.radians(df_clean[col_long].values.astype(float))
 
-                    # Công thức Haversine tính khoảng cách (mét)
+                    # Công thức Haversine
                     dlat = lat2 - lat1
                     dlon = lon2 - lon1
                     a = np.sin(dlat / 2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2)**2
                     c = 2 * np.arcsin(np.sqrt(a))
                     r = 6371000  # Bán kính Trái Đất (m)
                     
-                    # Gán kết quả khoảng cách
                     df_clean['Khoảng cách (m)'] = c * r
 
-                    # 3. Sắp xếp theo khoảng cách tăng dần
+                    # Sắp xếp theo khoảng cách
                     df_sorted = df_clean.sort_values(by='Khoảng cách (m)').copy()
 
-                    # Danh sách các cột cần kiểm tra trùng lặp thông tin
-                    check_cols = [col_ten_tram, col_ma_tram, col_trang_thai, col_tinh, col_mien_dia_ly, col_lat, col_long]
-                    existing_cols = [c for c in check_cols if c and c in df_sorted.columns]
+                    # Hàm gom nhóm dữ liệu trùng Mã Trạm / Tọa độ để kết hợp Loại Trạm bằng dấu &
+                    def combine_unique(series):
+                        vals = [str(v).strip() for v in series if pd.notna(v) and str(v).strip() not in ['', '-']]
+                        # Lọc trùng giữ thứ tự
+                        seen = set()
+                        unique_vals = []
+                        for v in vals:
+                            if v not in seen:
+                                seen.add(v)
+                                unique_vals.append(v)
+                        return " & ".join(unique_vals) if unique_vals else "-"
 
-                    # Loại bỏ các dòng trùng thông tin hoàn toàn, chỉ giữ lại dòng đầu tiên
-                    df_dedup = df_sorted.drop_duplicates(subset=existing_cols, keep='first').copy()
+                    # Nhóm theo Mã trạm (hoặc Tên trạm + Lat + Long)
+                    group_cols = [col_ma_tram, col_lat, col_long]
+                    existing_group_cols = [c for c in group_cols if c in df_sorted.columns]
 
-                    # Lấy đúng 5 kết quả độc nhất gần nhất
-                    top5 = df_dedup.head(5).copy()
+                    grouped = df_sorted.groupby(existing_group_cols, as_index=False, sort=False).agg({
+                        'Khoảng cách (m)': 'first',
+                        col_ten_tram: 'first',
+                        col_trang_thai: combine_unique,
+                        'Loại Trạm Temp': combine_unique,
+                        col_tinh: 'first',
+                        col_mien_dia_ly: 'first',
+                    })
 
-                    # Định dạng làm tròn khoảng cách 2 chữ số thập phân
+                    # Lấy 5 trạm độc nhất đầu tiên
+                    top5 = grouped.head(5).copy()
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
 
-                    # Mã HTML tạo bảng kẻ khung
+                    # Mã HTML hiển thị bảng
                     html_code = """
                     <style>
                         .custom-table {
@@ -182,16 +208,8 @@ try:
                         lat_val = str(row[col_lat])
                         long_val = str(row[col_long])
                         coord_str = f"{lat_val}, {long_val}"
+                        loai_tram_val = str(row['Loại Trạm Temp']) if row['Loại Trạm Temp'] != "" else "-"
                         
-                        # Ưu tiên lấy dữ liệu từ PIC PTML (cột E), nếu trống thì thử lấy Phân loại (cột B)
-                        loai_tram_val = ""
-                        if col_pic_ptml in row and pd.notna(row[col_pic_ptml]) and str(row[col_pic_ptml]).strip() != "":
-                            loai_tram_val = str(row[col_pic_ptml]).strip()
-                        elif col_phan_loai in row and pd.notna(row[col_phan_loai]) and str(row[col_phan_loai]).strip() != "":
-                            loai_tram_val = str(row[col_phan_loai]).strip()
-                        else:
-                            loai_tram_val = "-"
-
                         html_code += f"""
                             <tr>
                                 <td style="text-align: center; color: #888888; font-weight: bold;">{idx}</td>
