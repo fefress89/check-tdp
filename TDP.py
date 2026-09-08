@@ -21,6 +21,7 @@ try:
     df_clean = df_raw.copy()
 
     # Xác định vị trí cột theo tên hoặc chỉ số cột Excel
+    col_pic_ptml = 'PIC PTML' if 'PIC PTML' in df_clean.columns else df_clean.columns[4]         # Cột E (Loại trạm)
     col_ten_tram = 'Tên trạm' if 'Tên trạm' in df_clean.columns else df_clean.columns[6]          # Cột G
     col_ma_tram = 'Mã trạm theo SU' if 'Mã trạm theo SU' in df_clean.columns else df_clean.columns[5] # Cột F/H
     col_trang_thai = 'Trạng thái' if 'Trạng thái' in df_clean.columns else df_clean.columns[14]   # Cột O
@@ -78,7 +79,7 @@ try:
                     df_sorted = df_clean.sort_values(by='Khoảng cách (m)').copy()
 
                     # Danh sách các cột cần kiểm tra trùng lặp thông tin
-                    check_cols = [col_ten_tram, col_ma_tram, col_trang_thai, col_tinh, col_mien_dia_ly, col_lat, col_long]
+                    check_cols = [col_ten_tram, col_ma_tram, col_trang_thai, col_pic_ptml, col_tinh, col_mien_dia_ly, col_lat, col_long]
                     existing_cols = [c for c in check_cols if c in df_sorted.columns]
 
                     # Loại bỏ các dòng trùng thông tin hoàn toàn, chỉ giữ lại dòng đầu tiên
@@ -92,7 +93,7 @@ try:
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
 
-                    # Mã HTML tạo bảng kẻ khung, hiển thị cột Index 0, 1, 2, 3, 4 và nút Copy
+                    # Mã HTML tạo bảng kẻ khung, hiển thị các cột theo đúng thứ tự
                     html_code = """
                     <style>
                         .custom-table {
@@ -153,6 +154,7 @@ try:
                                 <th>Tên Trạm</th>
                                 <th>Mã Trạm</th>
                                 <th>Trạng Thái</th>
+                                <th>Loại Trạm</th>
                                 <th>Tỉnh</th>
                                 <th>Miền Địa Lý</th>
                                 <th>Lat</th>
@@ -167,6 +169,7 @@ try:
                         lat_val = str(row[col_lat])
                         long_val = str(row[col_long])
                         coord_str = f"{lat_val}, {long_val}"
+                        loai_tram_val = str(row[col_pic_ptml]) if pd.notna(row[col_pic_ptml]) else ""
                         
                         html_code += f"""
                             <tr>
@@ -175,6 +178,7 @@ try:
                                 <td>{row[col_ten_tram]}</td>
                                 <td>{row[col_ma_tram]}</td>
                                 <td>{row[col_trang_thai]}</td>
+                                <td>{loai_tram_val}</td>
                                 <td>{row[col_tinh]}</td>
                                 <td>{row[col_mien_dia_ly]}</td>
                                 <td>{lat_val}</td>
