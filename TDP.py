@@ -80,11 +80,6 @@ try:
                     # Định dạng làm tròn khoảng cách 2 chữ số thập phân
                     top5['Khoảng cách (m)'] = top5['Khoảng cách (m)'].round(2)
 
-                    # Tạo chuỗi tọa độ để copy (Lat, Long)
-                    top5['Tọa độ Copy (Lat, Long)'] = top5.apply(
-                        lambda r: f"{r[col_lat]}, {r[col_long]}", axis=1
-                    )
-
                     # Đổi tên các cột hiển thị
                     rename_map = {
                         col_ten_tram: 'Tên Trạm',
@@ -101,7 +96,12 @@ try:
                     top5['Lat'] = top5['Lat'].astype(str)
                     top5['Long'] = top5['Long'].astype(str)
 
-                    # Thứ tự các cột hiển thị đúng như bảng kẻ khung yêu cầu (Không có STT)
+                    # Cột chứa dữ liệu thực tế để copy
+                    top5['Tọa độ Copy (Lat, Long)'] = top5.apply(
+                        lambda r: f"{r['Lat']}, {r['Long']}", axis=1
+                    )
+
+                    # Thứ tự các cột hiển thị
                     output_cols = [
                         'Khoảng cách (m)', 
                         'Tên Trạm', 
@@ -118,10 +118,17 @@ try:
 
                     st.subheader("🎯 Kết quả 5 trạm gần nhất:")
                     
-                    # Bảng Kẻ Khung nguyên bản với ô Copy nhanh chuẩn Streamlit
+                    # Bảng Kẻ Khung với Cột Copy gọn gàng (Chỉ hiện Biểu tượng 📋 Copy)
                     st.dataframe(
                         top5[cols_to_display].reset_index(drop=True),
-                        use_container_width=True
+                        use_container_width=True,
+                        column_config={
+                            "Tọa độ Copy (Lat, Long)": st.column_config.TextColumn(
+                                "Tọa độ Copy (Lat, Long)",
+                                help="Rê chuột/Bấm vào biểu tượng 📋 ở góc ô để copy tọa độ",
+                                default="📋 Copy"
+                            )
+                        }
                     )
 
             except ValueError:
